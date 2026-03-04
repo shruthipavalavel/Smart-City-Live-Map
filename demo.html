@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Smart City Map — Bangalore</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Syne',sans-serif;background:#0a0c10;color:#e8ecf4}
+:root{
+  --bg:#0a0c10;--bg2:#111318;--bg3:#161a22;
+  --border:#252b38;--border2:#3d4659;
+  --t1:#e8ecf4;--t2:#8892a4;--t3:#525e72;
+  --green:#00e676;--red:#ff4757;--blue:#40c4ff;
+  --purple:#7c4dff;--gold:#ffd700;
+  --mono:'Space Mono',monospace;
+}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+#auth-screen{position:fixed;inset:0;z-index:9999;display:flex;background:var(--bg)}
+.auth-left{flex:1;display:flex;flex-direction:column;justify-content:center;padding:60px;position:relative;overflow:hidden;background:linear-gradient(135deg,#0a0c10,#111827)}
+.auth-grid{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:.4}
+.auth-left-content{position:relative;z-index:1}
+.auth-right{width:420px;display:flex;flex-direction:column;justify-content:center;padding:48px 40px;border-left:1px solid var(--border);background:var(--bg2)}
+.auth-tab{flex:1;padding:10px;background:none;border:none;border-bottom:2px solid transparent;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--t3);cursor:pointer;transition:all .2s}
+.auth-tab.active{color:var(--t1);border-bottom-color:var(--green)}
+.auth-input{width:100%;padding:11px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--t1);font-family:'Syne',sans-serif;font-size:13px;outline:none;transition:border .2s;margin-bottom:10px}
+.auth-input:focus{border-color:var(--green)}
+.auth-btn{width:100%;padding:12px;background:var(--green);border:none;border-radius:8px;color:#0a0c10;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;transition:opacity .2s;margin-top:4px}
+.auth-btn:hover{opacity:.88}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-error{padding:10px 14px;background:#ff475718;border:1px solid #ff475740;border-radius:8px;color:#ff4757;font-size:12px;margin-bottom:10px;display:none}
+#app-screen{display:none;flex-direction:column;height:100vh}
+#topbar{height:48px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0;z-index:1001}
+.tab-btn{flex:1;padding:8px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:10px;font-weight:700;color:var(--t3);cursor:pointer;font-family:var(--mono);letter-spacing:.5px;text-transform:uppercase;transition:all .2s}
+.tab-btn.active{color:var(--t1);border-bottom-color:var(--green)}
+.leaflet-tile-pane{filter:brightness(.8) saturate(.6) hue-rotate(190deg)}
+.leaflet-container{background:#0d1117}
+.leaflet-control-zoom{border:1px solid var(--border)!important;border-radius:8px!important;background:var(--bg3)!important;overflow:hidden}
+.leaflet-control-zoom a{background:var(--bg3)!important;color:var(--t2)!important;border-color:var(--border)!important}
+.leaflet-control-zoom a:hover{background:#1d2330!important;color:var(--t1)!important}
+.leaflet-popup-content-wrapper{background:var(--bg3);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.6);color:var(--t1)}
+.leaflet-popup-tip{background:var(--bg3)}
+.leaflet-popup-close-button{color:var(--t3)!important}
+.leaflet-popup-content{margin:0!important}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.95)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px) scale(.88)}to{opacity:1;transform:translateX(0) scale(1)}}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-left">
+    <div class="auth-grid"></div>
+    <div class="auth-left-content">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--green);animation:blink 2s ease infinite"></div>
+        <span style="font-size:12px;font-weight:700;letter-spacing:2px;color:var(--t3);font-family:var(--mono)">LIVE · BANGALORE</span>
+      </div>
+      <h1 style="font-size:42px;font-weight:800;line-height:1.1;margin-bottom:16px">Smart City<br/><span style="color:var(--green)">Resource Map</span></h1>
+      <p style="font-size:15px;color:var(--t2);line-height:1.7;max-width:400px;margin-bottom:40px">Real-time crowdsourced availability of EV chargers, parking lots, and libraries across Bangalore.</p>
+      <div style="display:flex;gap:24px">
+        <div><div style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--green)">19</div><div style="font-size:11px;color:var(--t3);margin-top:2px">Locations</div></div>
+        <div><div style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--blue)">100m</div><div style="font-size:11px;color:var(--t3);margin-top:2px">Report Radius</div></div>
+        <div><div style="font-size:28px;font-weight:800;font-family:var(--mono);color:var(--gold)">5</div><div style="font-size:11px;color:var(--t3);margin-top:2px">XP Levels</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="auth-right">
+    <div style="margin-bottom:28px">
+      <div style="font-size:22px;font-weight:800;margin-bottom:6px">Welcome</div>
+      <div style="font-size:13px;color:var(--t3)">Sign in to track your contributions</div>
+    </div>
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:24px">
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div id="form-login">
+      <input class="auth-input" id="login-email" type="email" placeholder="Email address" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <input class="auth-input" id="login-password" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="auth-btn" id="login-btn" onclick="doLogin()">Sign In</button>
+      <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--t3)">No account? <span style="color:var(--green);cursor:pointer" onclick="switchAuthTab('signup')">Sign up free</span></div>
+    </div>
+    <div id="form-signup" style="display:none">
+      <input class="auth-input" id="signup-name" type="text" placeholder="Display name" onkeydown="if(event.key==='Enter')doSignup()"/>
+      <input class="auth-input" id="signup-email" type="email" placeholder="Email address" onkeydown="if(event.key==='Enter')doSignup()"/>
+      <input class="auth-input" id="signup-password" type="password" placeholder="Password (min 6 chars)" oninput="updatePwStrength(this.value)" onkeydown="if(event.key==='Enter')doSignup()"/>
+      <div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:10px;overflow:hidden"><div id="pw-bar" style="height:100%;width:0%;border-radius:2px;transition:all .3s"></div></div>
+      <button class="auth-btn" id="signup-btn" onclick="doSignup()">Create Account</button>
+      <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--t3)">Have an account? <span style="color:var(--green);cursor:pointer" onclick="switchAuthTab('login')">Sign in</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <!-- Topbar -->
+  <div id="topbar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 2s ease infinite"></div>
+      <span style="font-size:13px;font-weight:800;letter-spacing:1.5px">SMART CITY MAP</span>
+      <span style="font-size:10px;color:var(--t3);font-family:var(--mono)">Bangalore · Live</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:13px;font-weight:700;font-family:var(--mono)">19</span>
+      <span style="font-size:10px;color:var(--t3)">locations</span>
+      <div style="width:1px;height:16px;background:var(--border)"></div>
+      <span id="tb-rep-count" style="font-size:13px;font-weight:700;font-family:var(--mono)">0</span>
+      <span style="font-size:10px;color:var(--t3)">reports</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="xp-pill" onclick="setTab('stats')" style="display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 12px;cursor:pointer">
+        <span id="xp-level-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;font-family:var(--mono);background:#8892a422;color:#8892a4;border:1px solid #8892a450">SCOUT</span>
+        <span id="xp-amount" style="font-size:11px;font-weight:700;color:var(--gold);font-family:var(--mono)">0 XP</span>
+        <div style="width:48px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div id="xp-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--gold),#ff9800);border-radius:2px;transition:width .6s ease"></div>
+        </div>
+      </div>
+      <div id="user-name-pill" style="font-size:11px;color:var(--t2);font-family:var(--mono);padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:20px"></div>
+      <button onclick="doSignOut()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--t3);cursor:pointer;font-size:11px;padding:5px 10px;font-family:var(--mono)">Sign out</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex:1;overflow:hidden">
+    <!-- Sidebar -->
+    <div style="width:272px;height:100%;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0">
+      <div style="padding:14px 14px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="font-size:15px;font-weight:800;letter-spacing:1px">SMART CITY</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px;font-family:var(--mono)">Live Resource Map · Bangalore</div>
+      </div>
+      <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+        <button class="tab-btn active" id="tab-map-btn" onclick="setTab('map')">MAP</button>
+        <button class="tab-btn" id="tab-stats-btn" onclick="setTab('stats')">MY STATS</button>
+        <button class="tab-btn" id="tab-lb-btn" onclick="setTab('leaderboard')">RANKS</button>
+      </div>
+
+      <!-- MAP PANEL -->
+      <div id="panel-map" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:#00e67608;border-bottom:1px solid var(--border)">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></div>
+          <span style="font-size:10px;font-weight:700;color:var(--green);font-family:var(--mono);letter-spacing:1px">LIVE</span>
+          <span id="live-count" style="font-size:10px;color:var(--t3);font-family:var(--mono)">0 reports in last 30min</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border)">
+          <div style="background:var(--bg);border-radius:8px;padding:10px 6px;text-align:center;border:1px solid #00e67640"><div id="stat-avail" style="font-size:22px;font-weight:800;font-family:var(--mono);color:var(--green)">0</div><div style="font-size:9px;color:var(--t3);margin-top:4px;text-transform:uppercase;letter-spacing:.5px">Available</div></div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px 6px;text-align:center;border:1px solid #ff475740"><div id="stat-busy" style="font-size:22px;font-weight:800;font-family:var(--mono);color:var(--red)">0</div><div style="font-size:9px;color:var(--t3);margin-top:4px;text-transform:uppercase;letter-spacing:.5px">Busy</div></div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px 6px;text-align:center;border:1px solid #8892a440"><div id="stat-unk" style="font-size:22px;font-weight:800;font-family:var(--mono);color:var(--t2)">19</div><div style="font-size:9px;color:var(--t3);margin-top:4px;text-transform:uppercase;letter-spacing:.5px">Unknown</div></div>
+        </div>
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-family:var(--mono)">RESOURCE TYPES</div>
+          <button id="filter-ev" onclick="toggleFilter('ev')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:#00e67615;border:1px solid #00e67650;border-radius:8px;cursor:pointer;color:var(--green);font-size:13px;font-family:'Syne',sans-serif;font-weight:600;text-align:left;margin-bottom:6px">
+            <span>⚡</span><span>EV Chargers</span><span style="margin-left:auto;font-size:10px;background:var(--border);padding:2px 6px;border-radius:8px;font-family:var(--mono)">10</span>
+          </button>
+          <button id="filter-parking" onclick="toggleFilter('parking')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:#40c4ff15;border:1px solid #40c4ff50;border-radius:8px;cursor:pointer;color:var(--blue);font-size:13px;font-family:'Syne',sans-serif;font-weight:600;text-align:left;margin-bottom:6px">
+            <span>🅿️</span><span>Parking</span><span style="margin-left:auto;font-size:10px;background:var(--border);padding:2px 6px;border-radius:8px;font-family:var(--mono)">6</span>
+          </button>
+          <button id="filter-library" onclick="toggleFilter('library')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:#7c4dff15;border:1px solid #7c4dff50;border-radius:8px;cursor:pointer;color:var(--purple);font-size:13px;font-family:'Syne',sans-serif;font-weight:600;text-align:left;margin-bottom:6px">
+            <span>📚</span><span>Libraries</span><span style="margin-left:auto;font-size:10px;background:var(--border);padding:2px 6px;border-radius:8px;font-family:var(--mono)">3</span>
+          </button>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-family:var(--mono)">HOW IT WORKS</div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5;display:flex;gap:8px"><span style="color:var(--border2);font-family:var(--mono);font-weight:700;flex-shrink:0;font-size:10px">01</span>Click a marker within 100m to report status</div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5;display:flex;gap:8px"><span style="color:var(--border2);font-family:var(--mono);font-weight:700;flex-shrink:0;font-size:10px">02</span>Earn XP for every report — bonus if confirmed</div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:8px;line-height:1.5;display:flex;gap:8px"><span style="color:var(--border2);font-family:var(--mono);font-weight:700;flex-shrink:0;font-size:10px">03</span>Level up: Scout → Reporter → Verified → Guardian → Legend</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.5;display:flex;gap:8px"><span style="color:var(--border2);font-family:var(--mono);font-weight:700;flex-shrink:0;font-size:10px">04</span>Higher-level reporters' votes carry more weight</div>
+        </div>
+        <div style="padding:10px 14px;font-size:9px;color:var(--border2);border-top:1px solid var(--border);font-family:var(--mono);margin-top:auto">OpenStreetMap · 100m report radius · Trust-weighted</div>
+      </div>
+
+      <!-- STATS PANEL -->
+      <div id="panel-stats" style="flex:1;overflow-y:auto;display:none;flex-direction:column">
+        <div style="margin:14px 14px 0;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div id="stats-avatar" style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid #8892a4;background:#8892a422">🌱</div>
+            <div>
+              <div id="stats-level-name" style="font-size:14px;font-weight:700;color:#8892a4">Scout</div>
+              <div id="stats-level-desc" style="font-size:10px;font-family:var(--mono);color:var(--t3);margin-top:2px">Just getting started</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:10px;color:var(--t3);font-family:var(--mono)">XP Progress</span>
+            <span id="stats-xp-label" style="font-size:10px;color:var(--gold);font-family:var(--mono);font-weight:700">0 / 50 XP</span>
+          </div>
+          <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div id="stats-xp-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--gold),#ff9800);border-radius:3px;transition:width .8s ease"></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px">
+            <div style="text-align:center"><div id="s-xp" style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--gold)">0</div><div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px">Total XP</div></div>
+            <div style="text-align:center"><div id="s-rep" style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--green)">0</div><div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px">Reports</div></div>
+            <div style="text-align:center"><div id="s-acc" style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--blue)">—</div><div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px">Accuracy</div></div>
+          </div>
+        </div>
+        <div style="padding:12px 14px;border-top:1px solid var(--border);margin-top:12px">
+          <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px">BADGES</div>
+          <div id="badges-grid" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div style="padding:12px 14px;border-top:1px solid var(--border)">
+          <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px">HOW TO EARN XP</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:6px 8px;background:var(--bg);border-radius:6px;margin-bottom:5px"><span style="color:var(--t2)">Submit any report</span><span style="color:var(--gold);font-family:var(--mono);font-weight:700">+10 XP</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:6px 8px;background:var(--bg);border-radius:6px;margin-bottom:5px"><span style="color:var(--t2)">Report confirmed by crowd</span><span style="color:var(--gold);font-family:var(--mono);font-weight:700">+15 XP</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:6px 8px;background:var(--bg);border-radius:6px;margin-bottom:5px"><span style="color:var(--t2)">First report on a location</span><span style="color:var(--gold);font-family:var(--mono);font-weight:700">+5 XP bonus</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:6px 8px;background:var(--bg);border-radius:6px"><span style="color:var(--t2)">Every 5 reports (streak)</span><span style="color:var(--gold);font-family:var(--mono);font-weight:700">+20 XP</span></div>
+        </div>
+      </div>
+
+      <!-- LEADERBOARD PANEL -->
+      <div id="panel-leaderboard" style="flex:1;overflow-y:auto;display:none;flex-direction:column">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+          <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono);margin-bottom:4px">TOP CONTRIBUTORS</div>
+          <div style="font-size:11px;color:var(--t3);font-family:var(--mono)">Bangalore · All time</div>
+        </div>
+        <div id="lb-list" style="padding:12px 14px;display:flex;flex-direction:column;gap:5px"></div>
+        <div style="padding:10px 14px;border-top:1px solid var(--border);margin-top:auto">
+          <div style="padding:10px;background:var(--bg);border-radius:8px;border:1px solid #ffd70040">
+            <div style="font-size:10px;color:var(--gold);font-family:var(--mono);font-weight:700;margin-bottom:4px">YOUR RANK</div>
+            <div id="lb-myrank-text" style="font-size:12px;color:var(--t2)">Submit reports to appear on the leaderboard</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div style="flex:1;position:relative">
+      <div id="map" style="height:100%;width:100%"></div>
+      <div style="position:absolute;bottom:32px;right:12px;background:#111318ee;border:1px solid var(--border);border-radius:10px;padding:12px;z-index:1000;backdrop-filter:blur(8px);min-width:136px">
+        <div style="font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px">LEGEND</div>
+        <div style="font-size:11px;margin-bottom:4px">⚡ <span style="color:var(--green)">EV Chargers</span></div>
+        <div style="font-size:11px;margin-bottom:4px">🅿️ <span style="color:var(--blue)">Parking</span></div>
+        <div style="font-size:11px;margin-bottom:8px">📚 <span style="color:var(--purple)">Libraries</span></div>
+        <div style="height:1px;background:var(--border);margin-bottom:8px"></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:4px"><div style="width:8px;height:8px;border-radius:50%;background:#00e676;flex-shrink:0"></div><span style="color:var(--t2)">Available</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:4px"><div style="width:8px;height:8px;border-radius:50%;background:#ff4757;flex-shrink:0"></div><span style="color:var(--t2)">Busy</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px"><div style="width:8px;height:8px;border-radius:50%;background:#8892a4;flex-shrink:0"></div><span style="color:var(--t2)">Unknown</span></div>
+        <div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">📍 100m report radius</div>
+      </div>
+      <div style="position:absolute;top:12px;right:56px;background:#00e67615;border:1px solid #00e67640;border-radius:20px;padding:5px 12px;font-size:11px;color:var(--green);z-index:1000;display:flex;align-items:center;gap:6px;font-family:var(--mono);backdrop-filter:blur(8px)">
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></span>
+        <span id="live-badge-text">0 live reports</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" style="position:fixed;top:60px;right:20px;z-index:9999;pointer-events:none;display:flex;flex-direction:column;gap:8px"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js'
+import { getDatabase, ref, push, onValue, set, get } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js'
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js'
+
+// ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+  measurementId: ""
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+
+const fbApp = initializeApp(firebaseConfig)
+const db    = getDatabase(fbApp)
+const auth  = getAuth(fbApp)
+
+// ── Data ──────────────────────────────────────────────────────────────────
+const RESOURCES = [
+  {id:'ev_001',  name:'BESCOM EV – E6 Indiranagar SDO',  type:'ev',      lat:12.9645, lng:77.6443, capacity:3,   operator:'BESCOM / EV Mitra', address:'16th D Main Rd, HAL 2nd Stage'},
+  {id:'ev_002',  name:'TTMC Domlur EV Charging',          type:'ev',      lat:12.9608, lng:77.6387, capacity:2,   operator:'BESCOM / BMTC',     address:'TTMC Domlur, Old Airport Rd'},
+  {id:'ev_003',  name:'TTMC Shivajinagar EV Charging',    type:'ev',      lat:12.9849, lng:77.5992, capacity:1,   operator:'BESCOM / BMTC',     address:'BMTC Bus Stand, Shivajinagar'},
+  {id:'ev_004',  name:'TTMC Whitefield EV Charging',      type:'ev',      lat:12.9698, lng:77.7499, capacity:2,   operator:'BESCOM / BMTC',     address:'TTMC, Whitefield Main Rd'},
+  {id:'ev_005',  name:'BESCOM EV – Mahadevapura SDO',     type:'ev',      lat:12.9944, lng:77.6967, capacity:3,   operator:'BESCOM / EV Mitra', address:'Mahadevapura, Whitefield area'},
+  {id:'ev_006',  name:'BESCOM EV – E8 Banaswadi SDO',     type:'ev',      lat:13.0102, lng:77.6472, capacity:3,   operator:'BESCOM / EV Mitra', address:'Banaswadi, Bangalore'},
+  {id:'ev_007',  name:'BESCOM EV – HSR Division SDO',     type:'ev',      lat:12.9081, lng:77.6476, capacity:4,   operator:'BESCOM / EV Mitra', address:'HSR Layout, Bangalore'},
+  {id:'ev_008',  name:'BESCOM EV – BTM Layout',           type:'ev',      lat:12.9166, lng:77.6101, capacity:3,   operator:'BESCOM / EV Mitra', address:'16th Main, BTM 1st Stage'},
+  {id:'ev_009',  name:'TTMC Yeshwanthapura EV Charging',  type:'ev',      lat:13.0298, lng:77.5497, capacity:3,   operator:'BESCOM / BMTC',     address:'TTMC Yeshwanthapura, Tumkur Rd'},
+  {id:'ev_010',  name:'BESCOM EV – Katriguppe SDO',       type:'ev',      lat:12.9148, lng:77.5673, capacity:3,   operator:'BESCOM / EV Mitra', address:'Katriguppe, Banashankari'},
+  {id:'park_001',name:'TTMC Whitefield Parking',          type:'parking', lat:12.9698, lng:77.7499, capacity:200, operator:'BMTC', address:'TTMC, Whitefield Main Rd'},
+  {id:'park_002',name:'TTMC Domlur Parking',              type:'parking', lat:12.9608, lng:77.6387, capacity:120, operator:'BMTC', address:'TTMC Domlur, Old Airport Rd'},
+  {id:'park_003',name:'TTMC Shivajinagar Parking',        type:'parking', lat:12.9849, lng:77.5992, capacity:150, operator:'BMTC', address:'BMTC Bus Stand, Shivajinagar'},
+  {id:'park_004',name:'BDA Domlur Complex Parking',       type:'parking', lat:12.9601, lng:77.6372, capacity:80,  operator:'BDA',  address:'BDA Domlur Complex'},
+  {id:'park_005',name:'TTMC Yeshwanthapura Parking',      type:'parking', lat:13.0298, lng:77.5497, capacity:100, operator:'BMTC', address:'TTMC Yeshwanthapura, Tumkur Rd'},
+  {id:'park_006',name:'BDA HBR Layout Parking',           type:'parking', lat:13.0247, lng:77.6453, capacity:60,  operator:'BDA',  address:'HBR Layout, Bangalore'},
+  {id:'lib_001', name:'Karnataka State Central Library',  type:'library', lat:12.9763, lng:77.5929, capacity:300, operator:'Dept. of Public Libraries', address:'Cubbon Park, Kasturba Rd'},
+  {id:'lib_002', name:'Indiranagar Branch Library',       type:'library', lat:12.9784, lng:77.6408, capacity:80,  operator:'Dept. of Public Libraries', address:'100 Feet Rd, Indiranagar'},
+  {id:'lib_003', name:'Jayanagar Branch Library',         type:'library', lat:12.9300, lng:77.5826, capacity:100, operator:'Dept. of Public Libraries', address:'4th Block, Jayanagar'},
+]
+
+const LEVELS = [
+  {name:'Scout',    emoji:'🌱', color:'#8892a4', min:0,    desc:'Just getting started'},
+  {name:'Reporter', emoji:'📡', color:'#40c4ff', min:50,   desc:'Making a real difference'},
+  {name:'Verified', emoji:'✅', color:'#00e676', min:150,  desc:'Trusted by the community'},
+  {name:'Guardian', emoji:'🛡️', color:'#ffd700', min:350,  desc:'City infrastructure hero'},
+  {name:'Legend',   emoji:'⭐', color:'#ff9800', min:700,  desc:'You run this city'},
+]
+
+const ALL_BADGES = [
+  {id:'first',   emoji:'📍', label:'First Report',  color:'#40c4ff', req:p=>p.total>=1},
+  {id:'five',    emoji:'🔥', label:'On a Roll',     color:'#ff9800', req:p=>p.total>=5},
+  {id:'ten',     emoji:'💪', label:'Committed',     color:'#00e676', req:p=>p.total>=10},
+  {id:'accurate',emoji:'🎯', label:'Sharp Eye',     color:'#7c4dff', req:(p,xp)=>p.total>=5&&p.correct/p.total>=0.8},
+  {id:'trusted', emoji:'🛡️', label:'Trusted',       color:'#ffd700', req:(p,xp)=>getLvlIdx(xp)>=2},
+  {id:'ev',      emoji:'⚡', label:'EV Champion',   color:'#00e676', req:p=>p.evRep>=3},
+  {id:'parking', emoji:'🅿️', label:'Parking Pro',  color:'#40c4ff', req:p=>p.parkRep>=3},
+  {id:'library', emoji:'📚', label:'Library Scout', color:'#7c4dff', req:p=>p.libRep>=3},
+  {id:'all',     emoji:'🌐', label:'All-Rounder',   color:'#ff4757', req:p=>p.evRep>=1&&p.parkRep>=1&&p.libRep>=1},
+]
+
+const TYPE_COLORS  = {ev:'#00e676', parking:'#40c4ff', library:'#7c4dff'}
+const STATUS_COLORS= {available:'#00e676', busy:'#ff4757', unknown:'#8892a4'}
+const TYPE_EMOJIS  = {ev:'⚡', parking:'🅿️', library:'📚'}
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentUser = null
+let player = {xp:0, total:0, correct:0, evRep:0, parkRep:0, libRep:0, earnedBadges:[]}
+let reports = []
+let activeFilters = new Set(['ev','parking','library'])
+let mapInstance = null
+let markers = {}
+let saveTimer = null
+let reportsUnsub = null
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function getLvlIdx(xp) {
+  for(let i=LEVELS.length-1;i>=0;i--) if(xp>=LEVELS[i].min) return i
+  return 0
+}
+function getLevel(xp) { return LEVELS[getLvlIdx(xp)] }
+function getLvlPct(xp) {
+  const i=getLvlIdx(xp), l=LEVELS[i], n=LEVELS[Math.min(i+1,LEVELS.length-1)]
+  if(l.min===n.min) return 100
+  return Math.min(100,((xp-l.min)/(n.min-l.min))*100)
+}
+function haversine(la1,ln1,la2,ln2) {
+  const R=6371000,dLa=(la2-la1)*Math.PI/180,dLn=(ln2-ln1)*Math.PI/180
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLn/2)**2
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+}
+function timeSince(ts) {
+  const m=Math.floor((Date.now()-ts)/60000)
+  return m<1?'just now':m<60?`${m}m ago`:`${Math.floor(m/60)}h ago`
+}
+function toast(text, type='xp') {
+  const el=document.createElement('div')
+  const c={xp:['#ffd70020','#ffd70060','var(--gold)'],level:['#7c4dff20','#7c4dff60','#b39ddb'],badge:['#00e67620','#00e67660','var(--green)']}[type]||['#ffd70020','#ffd70060','var(--gold)']
+  el.style.cssText=`padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;font-family:'Syne',sans-serif;animation:toastIn .4s cubic-bezier(.34,1.56,.64,1) forwards;box-shadow:0 4px 24px rgba(0,0,0,.5);background:${c[0]};border:1px solid ${c[1]};color:${c[2]}`
+  el.textContent=text
+  document.getElementById('toasts').appendChild(el)
+  setTimeout(()=>el.remove(),3200)
+}
+
+// ── Save/Load ──────────────────────────────────────────────────────────────
+function schedSave() {
+  if(saveTimer) clearTimeout(saveTimer)
+  saveTimer=setTimeout(()=>{
+    if(!currentUser) return
+    set(ref(db,`users/${currentUser.uid}`),{
+      ...player, earnedBadges:player.earnedBadges,
+      displayName:currentUser.displayName||currentUser.email||'',
+      lastSeen:Date.now()
+    }).catch(e=>console.error('Save failed:',e))
+  },800)
+}
+
+async function loadPlayer() {
+  if(!currentUser) return
+  try {
+    const snap=await get(ref(db,`users/${currentUser.uid}`))
+    if(snap.exists()) {
+      const d=snap.val()
+      player={
+        xp:       d.xp||0,
+        total:    d.total||0,
+        correct:  d.correct||0,
+        evRep:    d.evRep||0,
+        parkRep:  d.parkRep||0,
+        libRep:   d.libRep||0,
+        earnedBadges: Array.isArray(d.earnedBadges)?d.earnedBadges:[],
+      }
+    }
+  } catch(e) { console.error('Load failed:',e) }
+}
+
+// ── XP ─────────────────────────────────────────────────────────────────────
+function awardXP(amount, reason) {
+  const oldIdx=getLvlIdx(player.xp)
+  player.xp+=amount
+  const newIdx=getLvlIdx(player.xp)
+  toast(`+${amount} XP · ${reason}`)
+  if(newIdx>oldIdx) setTimeout(()=>toast(`🎉 Level up! You're now ${LEVELS[newIdx].name}`,'level'),650)
+  checkBadges()
+  updateTopbar()
+  updateStatsUI()
+  schedSave()
+}
+
+function checkBadges() {
+  ALL_BADGES.forEach(b=>{
+    if(!player.earnedBadges.includes(b.id)&&b.req(player,player.xp)){
+      player.earnedBadges.push(b.id)
+      setTimeout(()=>toast(`🏆 Badge: ${b.emoji} ${b.label}`,'badge'),1000)
+    }
+  })
+}
+
+// ── Trust ──────────────────────────────────────────────────────────────────
+function computeTrust() {
+  const us={}
+  const byRes={}
+  reports.forEach(r=>{ (byRes[r.resourceId]=byRes[r.resourceId]||[]).push(r) })
+  Object.values(byRes).forEach(reps=>{
+    reps.forEach(r=>{
+      const win=reps.filter(x=>x.id!==r.id&&Math.abs(x.createdAt-r.createdAt)<=900000)
+      if(!win.length) return
+      let av=0,bu=0; win.forEach(x=>x.status==='available'?av++:bu++)
+      const maj=av>=bu?'available':'busy'
+      us[r.userId]=us[r.userId]||{c:0,t:0}; us[r.userId].t++
+      if(r.status===maj) us[r.userId].c++
+    })
+  })
+  const sc={}
+  Object.entries(us).forEach(([uid,{c,t}])=>{ sc[uid]=(c+1)/(t+2) })
+  return sc
+}
+
+function getTWStatus(resourceId) {
+  const now=Date.now(), ts=computeTrust()
+  const rec=reports.filter(r=>r.resourceId===resourceId&&now-r.createdAt<=1800000)
+  if(!rec.length) return 'unknown'
+  let av=0,bu=0
+  rec.forEach(r=>{ const t=ts[r.userId]??0.5; r.status==='available'?av+=t:bu+=t })
+  return av>=bu?'available':'busy'
+}
+
+// ── Map ────────────────────────────────────────────────────────────────────
+function makeIcon(type, status) {
+  const tc=TYPE_COLORS[type]||'#8892a4'
+  const color=status==='unknown'?tc:(STATUS_COLORS[status]||tc)
+  const emoji=TYPE_EMOJIS[type]||'📍'
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 50" width="36" height="45">
+    <defs><filter id="sh${type}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="${color}80"/></filter></defs>
+    <path d="M20 2C10 2,2 10,2 20C2 32,20 48,20 48C20 48,38 32,38 20C38 10,30 2,20 2Z" fill="${color}" filter="url(#sh${type})" stroke="${color}cc" stroke-width="1"/>
+    <circle cx="20" cy="19" r="11" fill="${color}22" stroke="${color}66" stroke-width="1"/>
+    <text x="20" y="24" text-anchor="middle" font-size="12">${emoji}</text>
+  </svg>`
+  return L.divIcon({html:svg,className:'',iconSize:[36,45],iconAnchor:[18,45],popupAnchor:[0,-47]})
+}
+
+function buildPopup(resource) {
+  const status=getTWStatus(resource.id)
+  const sc={available:{color:'#00e676',bg:'#00e67618',label:'Available'},busy:{color:'#ff4757',bg:'#ff475718',label:'Busy'},unknown:{color:'#8892a4',bg:'#8892a418',label:'Unknown'}}[status]
+  const trust=computeTrust()
+  const rec=reports.filter(r=>r.resourceId===resource.id&&Date.now()-r.createdAt<=1800000).slice(-3).reverse()
+
+  let recentHtml=''
+  if(rec.length) {
+    recentHtml=`<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:10px">Recent activity</div>`
+    rec.forEach(r=>{
+      const score=trust[r.userId]??0
+      const tl=score>=0.75?{label:'Trusted',color:'#00e676'}:score>=0.5?{label:'Reliable',color:'#ffb74d'}:{label:'New',color:'#8892a4'}
+      recentHtml+=`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px">
+        <span style="flex:1;font-weight:600;color:${r.status==='available'?'#00e676':'#ff4757'}">${r.status==='available'?'🟢':'🔴'} ${r.status}</span>
+        <span style="color:${tl.color};font-size:10px">${tl.label}</span>
+        <span style="color:var(--t3);font-size:10px;font-family:var(--mono)">${timeSince(r.createdAt)}</span>
+      </div>`
+    })
+  }
+
+  return `<div style="width:272px;padding:16px;font-family:'Syne',sans-serif">
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
+      <span style="font-size:20px">${TYPE_EMOJIS[resource.type]}</span>
+      <div><div style="font-size:14px;font-weight:700;line-height:1.3">${resource.name}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${resource.address}</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:1px solid ${sc.color}40;background:${sc.bg};margin-bottom:12px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${sc.color}"></div>
+      <span style="font-weight:600;font-size:13px;color:${sc.color}">${sc.label}</span>
+      ${rec.length?`<span style="margin-left:auto;font-size:10px;color:var(--t2);background:var(--border);padding:2px 8px;border-radius:12px">${rec.length} reports</span>`:''}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:var(--bg);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Capacity</div><div style="font-size:14px;font-weight:700;font-family:var(--mono)">${resource.capacity??'—'}</div></div>
+      <div style="background:var(--bg);border-radius:6px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Operator</div><div style="font-size:10px;font-weight:700;font-family:var(--mono);color:var(--t2)">${resource.operator||'—'}</div></div>
+    </div>
+    <div style="height:1px;background:var(--border);margin-bottom:12px"></div>
+    <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Update availability</div>
+    <div style="font-size:10px;color:var(--gold);font-family:var(--mono);margin-bottom:8px">📍 Within 100m only · +10 XP per report</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <button onclick="window._report('${resource.id}','available')" style="padding:10px;border:1px solid #00e67640;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:#00e67615;color:var(--green);font-family:'Syne',sans-serif;display:flex;flex-direction:column;align-items:center;gap:2px">✓ Available<span style="font-size:9px;opacity:.7;font-family:var(--mono)">+10 XP</span></button>
+      <button onclick="window._report('${resource.id}','busy')" style="padding:10px;border:1px solid #ff475740;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:#ff475715;color:var(--red);font-family:'Syne',sans-serif;display:flex;flex-direction:column;align-items:center;gap:2px">✕ Busy<span style="font-size:9px;opacity:.7;font-family:var(--mono)">+10 XP</span></button>
+    </div>
+    <div id="pmsg-${resource.id}" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;text-align:center;margin-bottom:8px"></div>
+    ${recentHtml}
+  </div>`
+}
+
+function refreshMarkers() {
+  if(!mapInstance) return
+  RESOURCES.forEach(r=>{
+    if(!activeFilters.has(r.type)){
+      if(markers[r.id]){ mapInstance.removeLayer(markers[r.id]); delete markers[r.id] }
+      return
+    }
+    const status=getTWStatus(r.id)
+    const icon=makeIcon(r.type,status)
+    if(markers[r.id]){
+      markers[r.id].setIcon(icon)
+      markers[r.id].setPopupContent(buildPopup(r))
+    } else {
+      const m=L.marker([r.lat,r.lng],{icon}).addTo(mapInstance)
+      m.bindPopup(buildPopup(r),{maxWidth:292,minWidth:272})
+      m.on('popupopen',()=>{ setTimeout(()=>m.setPopupContent(buildPopup(r)),50) })
+      markers[r.id]=m
+    }
+  })
+}
+
+function initMap() {
+  if(mapInstance) return
+  // Small delay to ensure the container is visible and sized
+  setTimeout(()=>{
+    mapInstance=L.map('map',{zoomControl:true}).setView([12.9716,77.5946],12)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'&copy; OpenStreetMap contributors',maxZoom:19
+    }).addTo(mapInstance)
+    refreshMarkers()
+    // force a size recalc
+    setTimeout(()=>mapInstance.invalidateSize(),300)
+  },100)
+}
+
+function updateMapStats() {
+  const now=Date.now()
+  const live=reports.filter(r=>now-r.createdAt<=1800000).length
+  const el1=document.getElementById('live-count')
+  const el2=document.getElementById('live-badge-text')
+  const el3=document.getElementById('tb-rep-count')
+  if(el1) el1.textContent=`${live} reports in last 30min`
+  if(el2) el2.textContent=`${live} live reports`
+  if(el3) el3.textContent=reports.length
+
+  let av=0,bu=0,uk=0
+  RESOURCES.forEach(r=>{ const s=getTWStatus(r.id); if(s==='available')av++;else if(s==='busy')bu++;else uk++ })
+  const sa=document.getElementById('stat-avail'), sb=document.getElementById('stat-busy'), su=document.getElementById('stat-unk')
+  if(sa) sa.textContent=av
+  if(sb) sb.textContent=bu
+  if(su) su.textContent=uk
+}
+
+function updateTopbar() {
+  const lvl=getLevel(player.xp), pct=getLvlPct(player.xp)
+  const badge=document.getElementById('xp-level-badge')
+  const amt=document.getElementById('xp-amount')
+  const bar=document.getElementById('xp-bar')
+  if(badge){ badge.textContent=lvl.name.toUpperCase(); badge.style.background=lvl.color+'22'; badge.style.color=lvl.color; badge.style.border=`1px solid ${lvl.color}50` }
+  if(amt) amt.textContent=`${player.xp} XP`
+  if(bar) bar.style.width=`${pct}%`
+}
+
+function updateStatsUI() {
+  const lvl=getLevel(player.xp), pct=getLvlPct(player.xp)
+  const nxt=LEVELS[Math.min(getLvlIdx(player.xp)+1,LEVELS.length-1)]
+  const av=document.getElementById('stats-avatar')
+  if(av){ av.textContent=lvl.emoji; av.style.borderColor=lvl.color; av.style.background=lvl.color+'22' }
+  const ln=document.getElementById('stats-level-name')
+  if(ln){ ln.textContent=lvl.name; ln.style.color=lvl.color }
+  const ld=document.getElementById('stats-level-desc')
+  if(ld) ld.textContent=lvl.desc
+  const xl=document.getElementById('stats-xp-label')
+  if(xl) xl.textContent=`${player.xp} / ${nxt.min} XP`
+  const xb=document.getElementById('stats-xp-bar')
+  if(xb) xb.style.width=`${pct}%`
+  const sx=document.getElementById('s-xp'), sr=document.getElementById('s-rep'), sa=document.getElementById('s-acc')
+  if(sx) sx.textContent=player.xp
+  if(sr) sr.textContent=player.total
+  if(sa) sa.textContent=player.total>=2?Math.round((player.correct/player.total)*100)+'%':'—'
+  const grid=document.getElementById('badges-grid')
+  if(grid){
+    grid.innerHTML=''
+    ALL_BADGES.forEach(b=>{
+      const earned=player.earnedBadges.includes(b.id)
+      const d=document.createElement('div')
+      d.title=''
+      d.style.cssText=`padding:4px 9px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid ${b.color}40;display:flex;align-items:center;gap:4px;background:${b.color}15;color:${b.color};opacity:${earned?1:.25};filter:${earned?'none':'grayscale(1)'}`
+      d.textContent=`${b.emoji} ${b.label}`
+      grid.appendChild(d)
+    })
+  }
+}
+
+function updateLeaderboard() {
+  get(ref(db,'users')).then(snap=>{
+    const data=snap.val()||{}
+    const users=Object.entries(data).map(([uid,d])=>({uid,xp:d.xp||0,total:d.total||0,name:d.displayName||'Anonymous',isMe:uid===currentUser?.uid}))
+    users.sort((a,b)=>b.xp-a.xp)
+    const medals=['🥇','🥈','🥉']
+    const list=document.getElementById('lb-list')
+    if(!list) return
+    list.innerHTML=''
+    users.slice(0,10).forEach((u,i)=>{
+      const lv=getLevel(u.xp)
+      const d=document.createElement('div')
+      d.style.cssText=`display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid ${u.isMe?'var(--gold)':'var(--border)'};background:${u.isMe?'#ffd70010':'var(--bg)'}`
+      d.innerHTML=`<span style="font-size:11px;font-weight:800;font-family:var(--mono);width:22px">${i<3?medals[i]:`#${i+1}`}</span>
+        <span style="flex:1;font-size:12px;font-weight:600">${u.name}${u.isMe?' 👈':''}</span>
+        <span style="font-size:9px;padding:2px 5px;border-radius:4px;font-weight:700;font-family:var(--mono);background:${lv.color}22;color:${lv.color}">${lv.emoji} ${lv.name}</span>
+        <span style="font-size:11px;font-family:var(--mono);color:var(--gold);font-weight:700">${u.xp} XP</span>`
+      list.appendChild(d)
+    })
+    const myRank=users.findIndex(u=>u.isMe)+1
+    const myLvl=getLevel(player.xp)
+    const rt=document.getElementById('lb-myrank-text')
+    if(rt) rt.innerHTML=player.total>0?`Rank <strong style="color:var(--gold)">#${myRank}</strong> · ${myLvl.emoji} ${myLvl.name} · ${player.xp} XP`:'Submit reports to appear on the leaderboard'
+  }).catch(e=>console.error('Leaderboard error:',e))
+}
+
+// ── Report ─────────────────────────────────────────────────────────────────
+window._report = async (resourceId, status) => {
+  if(!currentUser){ toast('Please sign in first','badge'); return }
+  const resource=RESOURCES.find(r=>r.id===resourceId)
+  if(!resource) return
+
+  const showMsg=(text,ok)=>{
+    const el=document.getElementById(`pmsg-${resourceId}`)
+    if(!el) return
+    el.style.display='block'
+    el.style.color=ok?'#00e676':'#ff4757'
+    el.style.background=ok?'#00e67618':'#ff475718'
+    el.style.border=`1px solid ${ok?'#00e67640':'#ff475740'}`
+    el.textContent=text
+    setTimeout(()=>{ if(el) el.style.display='none' },3500)
+  }
+
+  try {
+    await new Promise((res,rej)=>{
+      if(!navigator.geolocation) return res()
+      navigator.geolocation.getCurrentPosition(
+        pos=>{ const d=haversine(pos.coords.latitude,pos.coords.longitude,resource.lat,resource.lng); d>100?rej(new Error(`You're ${Math.round(d)}m away. Must be within 100m to report.`)):res() },
+        ()=>res(),
+        {timeout:4000}
+      )
+    })
+
+    const isFirst=!reports.some(r=>r.resourceId===resourceId)
+    await push(ref(db,'reports'),{resourceId,userId:currentUser.uid,status,createdAt:Date.now()})
+
+    player.total++
+    if(resource.type==='ev')          player.evRep++
+    else if(resource.type==='parking') player.parkRep++
+    else if(resource.type==='library') player.libRep++
+
+    awardXP(10,'Report submitted')
+    if(isFirst) setTimeout(()=>awardXP(5,'First report here! 🎖️'),400)
+    if(player.total%5===0) setTimeout(()=>awardXP(20,`${player.total}-report streak! 🔥`),800)
+    showMsg('✓ Reported! +10 XP earned',true)
+  } catch(e) {
+    showMsg(e.message,false)
+  }
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+window.setTab = (tab) => {
+  ['map','stats','leaderboard'].forEach(t=>{
+    const p=document.getElementById(`panel-${t}`)
+    const b=document.getElementById(`tab-${t}-btn`)
+    if(p) p.style.display=t===tab?'flex':'none'
+    if(b) b.classList.toggle('active',t===tab)
+  })
+  if(tab==='stats') updateStatsUI()
+  if(tab==='leaderboard') updateLeaderboard()
+}
+
+window.toggleFilter = (type) => {
+  const colors={ev:{on:'var(--green)',bg:'#00e67615',border:'#00e67650'},parking:{on:'var(--blue)',bg:'#40c4ff15',border:'#40c4ff50'},library:{on:'var(--purple)',bg:'#7c4dff15',border:'#7c4dff50'}}
+  if(activeFilters.has(type)&&activeFilters.size>1) activeFilters.delete(type)
+  else activeFilters.add(type)
+  const btn=document.getElementById(`filter-${type}`)
+  const on=activeFilters.has(type), c=colors[type]
+  if(btn){ btn.style.color=on?c.on:'var(--t2)'; btn.style.background=on?c.bg:'var(--bg)'; btn.style.borderColor=on?c.border:'var(--border)' }
+  refreshMarkers()
+}
+
+// ── Auth UI ────────────────────────────────────────────────────────────────
+window.switchAuthTab = (tab) => {
+  document.getElementById('form-login').style.display=tab==='login'?'block':'none'
+  document.getElementById('form-signup').style.display=tab==='signup'?'block':'none'
+  document.getElementById('tab-login').classList.toggle('active',tab==='login')
+  document.getElementById('tab-signup').classList.toggle('active',tab==='signup')
+  document.getElementById('auth-error').style.display='none'
+}
+window.updatePwStrength = (pw) => {
+  let s=0
+  if(pw.length>=6)s++;if(pw.length>=10)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++
+  const bar=document.getElementById('pw-bar')
+  if(bar){ bar.style.width=`${s*20}%`; bar.style.background=['','#ff4757','#ffb74d','#ffd700','#00e676','#00e676'][s] }
+}
+function showAuthErr(msg){ const e=document.getElementById('auth-error'); if(e){e.textContent=msg;e.style.display='block'} }
+function setAuthLoad(id,on,text){ const b=document.getElementById(id); if(b){b.disabled=on;b.textContent=on?'Please wait...':text} }
+
+window.doLogin = async () => {
+  const email=document.getElementById('login-email').value.trim()
+  const pass=document.getElementById('login-password').value
+  if(!email||!pass){ showAuthErr('Please fill in all fields'); return }
+  setAuthLoad('login-btn',true,'Sign In')
+  try { await signInWithEmailAndPassword(auth,email,pass) }
+  catch(e){
+    const m={'auth/wrong-password':'Incorrect password.','auth/user-not-found':'No account with that email.','auth/invalid-credential':'Incorrect email or password.','auth/invalid-email':'Invalid email address.','auth/too-many-requests':'Too many attempts. Try again later.'}
+    showAuthErr(m[e.code]||e.message)
+    setAuthLoad('login-btn',false,'Sign In')
+  }
+}
+
+window.doSignup = async () => {
+  const name=document.getElementById('signup-name').value.trim()
+  const email=document.getElementById('signup-email').value.trim()
+  const pass=document.getElementById('signup-password').value
+  if(!name||!email||!pass){ showAuthErr('Please fill in all fields'); return }
+  if(pass.length<6){ showAuthErr('Password must be at least 6 characters'); return }
+  setAuthLoad('signup-btn',true,'Create Account')
+  try {
+    const cred=await createUserWithEmailAndPassword(auth,email,pass)
+    await updateProfile(cred.user,{displayName:name})
+    await set(ref(db,`users/${cred.user.uid}`),{xp:0,total:0,correct:0,evRep:0,parkRep:0,libRep:0,earnedBadges:[],displayName:name,lastSeen:Date.now()})
+  } catch(e){
+    const m={'auth/email-already-in-use':'An account with this email already exists.','auth/invalid-email':'Invalid email address.','auth/weak-password':'Password is too weak.'}
+    showAuthErr(m[e.code]||e.message)
+    setAuthLoad('signup-btn',false,'Create Account')
+  }
+}
+
+window.doSignOut = async () => {
+  if(saveTimer) clearTimeout(saveTimer)
+  await set(ref(db,`users/${currentUser.uid}`),{...player,earnedBadges:player.earnedBadges,displayName:currentUser.displayName||'',lastSeen:Date.now()}).catch(()=>{})
+  if(reportsUnsub) reportsUnsub()
+  await signOut(auth)
+  player={xp:0,total:0,correct:0,evRep:0,parkRep:0,libRep:0,earnedBadges:[]}
+  reports=[]
+  markers={}
+  mapInstance=null
+  document.getElementById('auth-screen').style.display='flex'
+  document.getElementById('app-screen').style.display='none'
+}
+
+// ── Auth state ─────────────────────────────────────────────────────────────
+onAuthStateChanged(auth, async user=>{
+  if(user){
+    currentUser=user
+    await loadPlayer()
+
+    document.getElementById('auth-screen').style.display='none'
+    document.getElementById('app-screen').style.display='flex'
+    const pill=document.getElementById('user-name-pill')
+    if(pill) pill.textContent=user.displayName||user.email||''
+
+    updateTopbar()
+    updateStatsUI()
+
+    // Listen to reports in real-time
+    reportsUnsub=onValue(ref(db,'reports'),snap=>{
+      const data=snap.val()||{}
+      reports=Object.entries(data).map(([id,v])=>({id,...v}))
+      refreshMarkers()
+      updateMapStats()
+    })
+
+    // Init map after app screen is visible
+    initMap()
+
+  } else {
+    currentUser=null
+    document.getElementById('auth-screen').style.display='flex'
+    document.getElementById('app-screen').style.display='none'
+  }
+})
+</script>
+</body>
+</html>
