@@ -242,23 +242,29 @@ Smart-City-Live-Map uses a trust-weighted voting mechanism to estimate resource 
 
 ### Trust Estimation
 
-For each report, the application examines other reports for the same resource submitted within 15 minutes of that report.
+For each resource, reports from the last 30 minutes are combined using the reporters' estimated trust scores.
 
-A report is considered consistent when it agrees with the majority status in that comparison window.
+The weighted vote for availability is calculated as:
 
-The trust estimate uses Laplace smoothing:
+$$
+V_{\text{available}} = \sum_{r \in A} T_{u(r)}
+$$
 
-\[
-T_u = \frac{C_u+1}{N_u+2}
-\]
+The weighted vote for busy status is calculated as:
 
-Where:
+$$
+V_{\text{busy}} = \sum_{r \in B} T_{u(r)}
+$$
 
-- \(T_u\) is the estimated trust score of user \(u\).
-- \(C_u\) is the number of reports agreeing with the comparison majority.
-- \(N_u\) is the number of reports evaluated.
+Here:
 
-If there are no comparable reports, the user does not receive an updated estimate from that comparison.
+- \(A\) represents the set of recent reports indicating that the resource is available.
+- \(B\) represents the set of recent reports indicating that the resource is busy.
+- \(T_{u(r)}\) represents the estimated trust score of the user who submitted report \(r\).
+
+The status with the higher weighted vote is selected. If no qualifying recent reports exist, the resource is marked as **Unknown**.
+
+
 
 ### Trust-Weighted Voting
 
