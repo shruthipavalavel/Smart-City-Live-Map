@@ -268,19 +268,30 @@ The status with the higher weighted vote is selected. If no qualifying recent re
 
 ### Trust-Weighted Voting
 
-For each resource, reports from the last 30 minutes contribute their reporter's estimated trust score to the corresponding status total.
+The trust-weighted votes are calculated as follows.
 
-\[
-V_{\text{available}}=\sum_{r \in A}T_{u(r)}
-\]
+**Available status:**
 
-\[
-V_{\text{busy}}=\sum_{r \in B}T_{u(r)}
-\]
+$$
+V_{\text{available}} = \sum_{r \in A} T_{u(r)}
+$$
 
-Where \(A\) and \(B\) are the sets of recent Available and Busy reports, respectively.
+**Busy status:**
 
-The status with the greater total weight is selected. A tie is resolved in favour of Available in the current implementation. If there are no qualifying recent reports, the status is Unknown.
+$$
+V_{\text{busy}} = \sum_{r \in B} T_{u(r)}
+$$
+
+Where:
+
+- \(V_{\text{available}}\) is the total trust weight of reports indicating availability.
+- \(V_{\text{busy}}\) is the total trust weight of reports indicating that the resource is busy.
+- \(A\) is the set of recent reports with status `available`.
+- \(B\) is the set of recent reports with status `busy`.
+- \(T_{u(r)}\) is the trust score of the user who submitted report \(r\).
+
+The application selects the status with the higher total trust weight. If no qualifying reports exist within the last 30 minutes, the resource is marked as **Unknown**.
+
 
 **Limitation:** Agreement between users is only a proxy for accuracy. The current implementation does not independently verify whether a report reflects the resource's actual condition. Trust scores are calculated from the available reports rather than maintained as a separately validated ground-truth reputation system.
 
